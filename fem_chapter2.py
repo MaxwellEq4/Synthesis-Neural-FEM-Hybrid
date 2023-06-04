@@ -7,6 +7,7 @@ from matplotlib.tri import Triangulation
 from mpl_toolkits.mplot3d import Axes3D
 import plotly.figure_factory as ff
 from scipy.spatial import Delaunay
+import plotly.graph_objects as go
 
 lam1 = 1
 lam2 = 1
@@ -246,3 +247,46 @@ u = np.linalg.solve(A, b)
 E = np.max(np.abs(u_analytical - u))
 print(E)
 
+#%%
+
+
+# c) case noelms1 = noelms2 = 6
+x0 = -10
+y0 = -10
+L1 = 2
+L2 = 2
+noelms1 = 90
+noelms2 = 90
+lam1 = 1
+lam2 = 1
+
+model = FEM(x0, y0, L1, L2, noelms1, noelms2)
+
+qt = 2 * np.pi ** 2 * np.cos(np.pi * model.VX) * np.cos(np.pi * model.VY)
+f = np.cos(np.pi * model.VX[model.bnodes]) * np.cos(np.pi * model.VY[model.bnodes])
+
+A, b = model.assembly(lam1, lam2, qt)
+A, b = model.dirbc(f, A, b)
+
+result = np.linalg.solve(A, b)
+
+result_reshaped = np.reshape(result, (noelms2+1, noelms1+1))
+result_clipped = result_reshaped[:int(noelms2/2+1), int(noelms1/2+1):]
+print('-----c)-----')
+print(result_clipped)
+
+# 3D visualization of solution
+fig = go.Figure(data=[go.Surface(x=model.VX, y=model.VY, z=result_reshaped)])
+fig.update_layout(title='3D visualization of solution', autosize=False,
+                  width=500, height=500,
+                  margin=dict(l=65, r=50, b=65, t=90))
+fig.show()
+fig.write_image("figure3.png")
+fig = ff.create_trisurf(x=model.VX, y=model.VY, z=result_reshaped.flatten(),
+                         simplices=model.EToV,
+                         colormap="Viridis",
+                         title="3D visualization of solution",
+                         aspectratio=dict(x=1, y=1, z=0.3))
+
+fig.show()
+fig.write_image("figure4.png")

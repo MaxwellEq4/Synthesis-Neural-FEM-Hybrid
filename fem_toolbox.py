@@ -1,5 +1,15 @@
 import numpy as np
 from scipy.spatial.distance import cdist
+import numpy as np
+from scipy.sparse import diags
+from scipy.linalg import solve
+import matplotlib.pyplot as plt
+from matplotlib.tri import Triangulation
+from mpl_toolkits.mplot3d import Axes3D
+import plotly.figure_factory as ff
+from scipy.spatial import Delaunay
+import plotly.graph_objects as go
+from scipy.interpolate import griddata
 
 class FEM:
     def __init__(self, x0, y0, L1, L2, noelms1, noelms2):
@@ -110,7 +120,7 @@ class FEM:
 
 
 
-    def assembly(self, lam1, lam2, qt):
+    def assembly(self, lam1 = 1, lam2 = 1, qt = None):
         nonodes = len(self.VX)
         noelms = len(self.EToV)
         A = np.zeros((nonodes, nonodes))
@@ -249,3 +259,93 @@ class FEM:
             b[j] -= qp12
         self.b = b
         return b
+    def fem_solve(self, qt_function, f_function, bc_type='dirbc', lam1=1, lam2=1):
+        """ Compute the solution according to given boundary condition type """
+        qt = qt_function(self.VX, self.VY)
+        f = f_function(self.VX[self.bnodes], self.VY[self.bnodes])
+        
+        self.A, self.b = self.assembly(lam1, lam2, qt)
+    
+        if bc_type == 'dirbc':
+            self.A, self.b = self.dirbc(f, self.A, self.b)
+        elif bc_type == 'neubc':
+            q = np.zeros(len(self.beds))
+            self.b = self.neubc(self.beds, q, self.b)
+            self.A, self.b = self.dirbc(f, self.A, self.b)
+        else:
+            raise ValueError("Invalid boundary condition type. Choose either 'dirbc' or 'neubc'.")
+        
+        u = np.linalg.solve(self.A, self.b)
+        
+        # plot
+        fig = plt.figure(figsize=(12, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_trisurf(self.VX, self.VY, u.flatten(), triangles=self.EToV, cmap='viridis')
+        ax.set_xlabel('x', fontsize=15)
+        ax.set_ylabel('y', fontsize=15)
+        ax.set_zlabel('z', fontsize=15)
+        ax.set_title('3D visualization of solution with ' + bc_type.capitalize() + ' BC', fontsize=17)
+        plt.show()
+        # create a grid of points where you want to interpolate
+        grid_x, grid_y = np.mgrid[min(self.VX):max(self.VX):100j, min(self.VY):max(self.VY):100j]  
+        
+        # interpolate the u values onto this grid
+        grid_u = griddata((self.VX, self.VY), u.flatten(), (grid_x, grid_y), method='cubic')
+    
+        # new standalone heatmap figure
+        fig, ax = plt.subplots(figsize=(8, 6))
+        img = ax.imshow(grid_u.T, extent=(min(self.VX), max(self.VX), min(self.VY), max(self.VY)), 
+                         origin='lower', cmap='plasma')
+        plt.colorbar(img, ax=ax)
+        ax.set_xlabel('x', fontsize=15)
+        ax.set_ylabel('y', fontsize=15)
+        ax.set_title('Heatmap of solution with ' + bc_type.capitalize() + ' BC', fontsize=17)
+        plt.show()
+    
+        return u
+
+    def set_u_zero(self):
+        """
+        Initialize the solution vector u with zeros
+        """
+        if hasattr(self, 'b'):
+            self.u = np.zeros_like(self.b)
+            return self.u
+        else:
+            raise ValueError('self.b is not defined. Call the assembly method before calling set_u_zero.')
+
+    def get_h(self):
+        """
+        Get the current solution vector h
+        """
+        if hasattr(self, 'u'):
+            return self.u
+        else:
+            raise ValueError('Solution vector u is not defined. Call the fem_solve method before calling get_h.')
+    def fem_error(self, analytical_sol):
+        """
+        Compute the error of the FEM solution against an analytical solution.
+        The analytical solution should be a function that takes two parameters (x, y coordinates).
+        """
+    
+        if not hasattr(self, 'u'):
+            raise ValueError('Solution vector u is not defined. Call the fem_solve method before calling fem_error.')
+    
+        # Compute analytical solution at FEM nodes
+        analytical_u = analytical_sol(self.VX, self.VY)
+    
+        # Compute error at FEM nodes
+        error = np.abs(analytical_u - self.u)
+    
+        # plot error
+        fig = plt.figure(figsize=(12, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_trisurf(self.VX, self.VY, error.flatten(), triangles=self.EToV, cmap='viridis')
+        ax.set_xlabel('x', fontsize=15)
+        ax.set_ylabel('y', fontsize=15)
+        ax.set_zlabel('Error', fontsize=15)
+        ax.set_title('3D visualization of error', fontsize=17)
+        plt.show()
+    
+        # return error
+        return error
