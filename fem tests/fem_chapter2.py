@@ -206,13 +206,13 @@ print(result)
 print('Error vector for test case 1')
 print(E)
 
-# fig = plt.figure(figsize=(12, 6))
-# ax = fig.add_subplot(111, projection='3d')
-# ax.plot_trisurf(model.VX, model.VY, result.flatten(), triangles=model.EToV, cmap='viridis')
-# ax.set_xlabel('x', fontsize=15)
-# ax.set_ylabel('y', fontsize=15)
-# ax.set_zlabel('z', fontsize=15)
-# ax.set_title('3D visualization of solution', fontsize=17)
+fig = plt.figure(figsize=(12, 6))
+ax = fig.add_subplot(111, projection='3d')
+ax.plot_trisurf(model.VX, model.VY, result.flatten(), triangles=model.EToV, cmap='viridis')
+ax.set_xlabel('x', fontsize=15)
+ax.set_ylabel('y', fontsize=15)
+ax.set_zlabel('z', fontsize=15)
+ax.set_title('3D visualization of solution', fontsize=17)
 
 
 fig = ff.create_trisurf(x=model.VX, y=model.VY, z=result.flatten(),
